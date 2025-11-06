@@ -11,4 +11,5 @@ pub struct CollateralVault {
     pub total_withdrawn: u64,
     pub created_at: i64,
     pub bump: u8,
+    pub authority: Pubkey,
 }

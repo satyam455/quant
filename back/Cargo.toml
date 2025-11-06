@@ -1,0 +1,26 @@
+[package]
+name = "back"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.8.6", features = ["macros"] }
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "full"] }
+serde_json = "1.0"
+
+# Anchor + Solana versions pinned for compatibility
+anchor-client = "0.32.1"
+anchor-lang = "0.32.1"
+anchor-spl = "0.32.1"
+
+solana-sdk = "3.0.0"
+solana-client = "3.0.10"
+solana-program = "3.0.0"
+
+anyhow = "1"
+thiserror = "2.0.17"
+uuid = { version = "1", features = ["v4"] }
+
+# Add your program as a dependency so you can use its types
+collateral_vault = { path = "../programs/collateral_vault" }

@@ -10,4 +10,10 @@ pub enum ErrorCode {
     InsufficientFunds,
     #[msg("Position Active")]
     ActivePosition,
+    #[msg("Insufficient Locked Funds")]
+    InsufficientLockedFunds,
+    #[msg("OverFlow")]
+    Overflow,
+    #[msg("UnderFlow")]
+    Underflow,
 }

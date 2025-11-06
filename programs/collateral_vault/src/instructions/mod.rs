@@ -7,4 +7,7 @@ pub mod withdraw;
 
 pub use deposit::*;
 pub use initialize_vault::*;
+pub use lock::*;
+pub use transfer_collateral::*;
+pub use unlock::*;
 pub use withdraw::*;

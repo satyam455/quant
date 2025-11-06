@@ -1,5 +1,5 @@
 [workspace]
-members = ["programs/*"]
+members = ["programs/collateral_vault", "back"]
 resolver = "2"
 
 [profile.release]
