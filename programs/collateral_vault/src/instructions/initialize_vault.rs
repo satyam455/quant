@@ -35,13 +35,6 @@ pub struct InitializeVault<'info> {
     )]
     pub vault_token_account: Account<'info, TokenAccount>,
 
-    #[account(
-        seeds = [b"vault_authority"],
-        bump
-    )]
-    /// CHECK: adding unchecked
-    pub vault_authority: UncheckedAccount<'info>,
-
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
     pub rent: Sysvar<'info, Rent>,

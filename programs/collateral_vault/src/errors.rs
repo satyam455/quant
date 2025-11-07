@@ -16,4 +16,6 @@ pub enum ErrorCode {
     Overflow,
     #[msg("UnderFlow")]
     Underflow,
+    #[msg("Invalid authority")]
+    InvalidAuthority,
 }

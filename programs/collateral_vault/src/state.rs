@@ -11,5 +11,30 @@ pub struct CollateralVault {
     pub total_withdrawn: u64,
     pub created_at: i64,
     pub bump: u8,
-    pub authority: Pubkey,
+}
+
+#[account]
+pub struct MultisigConfig {
+    pub vault: Pubkey,
+    pub signers: Vec<Pubkey>,
+    pub threshold: u8,
+    pub bump: u8,
+}
+
+#[account]
+pub struct WithdrawalRequest {
+    pub vault: Pubkey,
+    pub user: Pubkey,
+    pub amount: u64,
+    pub requested_at: i64,
+    pub available_at: i64,
+    pub executed: bool,
+    pub bump: u8,
+}
+
+#[account]
+pub struct WithdrawalWhitelist {
+    pub vault: Pubkey,
+    pub addresses: Vec<Pubkey>,
+    pub bump: u8,
 }

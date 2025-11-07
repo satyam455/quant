@@ -7,7 +7,8 @@ use anchor_client::{
     },
     Client, Cluster, Program,
 };
-use anchor_lang::prelude::Pubkey;
+use anchor_lang::{prelude::Pubkey, AccountDeserialize};
+use anchor_spl::token::TokenAccount;
 use anyhow::Result;
 use std::sync::Arc;
 
@@ -45,9 +46,6 @@ impl VaultManager {
         let (vault_token_account, _) =
             Pubkey::find_program_address(&[b"vault_token", user.as_ref()], &self.program.id());
 
-        let (vault_authority, _) =
-            Pubkey::find_program_address(&[b"vault_authority"], &self.program.id());
-
         let ix_data =
             anchor_lang::InstructionData::data(&collateral_vault::instruction::InitializeVault {});
 
@@ -56,7 +54,6 @@ impl VaultManager {
             vault: vault_pda,
             usdt_mint: self.usdt_mint,
             vault_token_account,
-            vault_authority,
             system_program: system_program::ID,
             token_program: anchor_spl::token::ID,
             rent: sysvar::rent::ID,
@@ -89,8 +86,28 @@ impl VaultManager {
         let (vault_pda, _) =
             Pubkey::find_program_address(&[b"vault", user.as_ref()], &self.program.id());
 
-        let (vault_token_account, _) =
-            Pubkey::find_program_address(&[b"vault_token", user.as_ref()], &self.program.id());
+        // Fetch vault state to get the correct token_account
+        let account = self.program.rpc().get_account(&vault_pda)?;
+        let mut data: &[u8] = &account.data;
+        let vault = collateral_vault::state::CollateralVault::try_deserialize(&mut data)?;
+        let vault_token_account = vault.token_account; // Use stored token account
+
+        // Validate that vault_token_account is associated with the correct mint
+        let vault_token_account_data = self.program.rpc().get_account(&vault_token_account)?;
+        let mut vault_token_data: &[u8] = &vault_token_account_data.data;
+        let vault_token_state = TokenAccount::try_deserialize(&mut vault_token_data)
+            .map_err(|e| anyhow::anyhow!("Failed to parse vault token account: {}", e))?;
+
+        if vault_token_state.mint != self.usdt_mint {
+            return Err(anyhow::anyhow!(
+                "Vault mint mismatch: vault uses {}, but backend expects {}. \
+                 The vault was initialized with a different mint. Please use a different user keypair \
+                 to create a new vault with the correct mint, or update the backend to use mint {}",
+                vault_token_state.mint,
+                self.usdt_mint,
+                vault_token_state.mint
+            ));
+        }
 
         let user_token_account =
             anchor_spl::associated_token::get_associated_token_address(&user, &self.usdt_mint);
@@ -263,7 +280,7 @@ impl VaultManager {
         );
 
         let accounts = collateral_vault::accounts::TransferCollateral {
-            authority: self.payer.pubkey(),
+            owner: self.payer.pubkey(),
             from_vault,
             to_vault,
         };

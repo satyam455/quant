@@ -5,10 +5,11 @@ use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct TransferCollateral<'info> {
-    /// Authority program allowed to call this (liquidator, settlement program, etc.)
-    pub authority: Signer<'info>,
+    /// Owner of the from_vault (must match from_vault.owner)
+    #[account(mut)]
+    pub owner: Signer<'info>,
 
-    #[account(mut, has_one = authority)]
+    #[account(mut, has_one = owner @ ErrorCode::InvalidAuthority)]
     pub from_vault: Account<'info, CollateralVault>,
 
     #[account(mut)]
