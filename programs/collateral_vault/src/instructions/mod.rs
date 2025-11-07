@@ -1,13 +1,19 @@
+pub mod authority;
 pub mod deposit;
 pub mod initialize_vault;
 pub mod lock;
+pub mod multisig;
+pub mod security;
 pub mod transfer_collateral;
 pub mod unlock;
 pub mod withdraw;
 
+pub use authority::*;
 pub use deposit::*;
 pub use initialize_vault::*;
 pub use lock::*;
+pub use multisig::*;
+pub use security::*;
 pub use transfer_collateral::*;
 pub use unlock::*;
 pub use withdraw::*;

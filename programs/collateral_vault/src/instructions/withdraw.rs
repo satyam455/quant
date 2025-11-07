@@ -16,7 +16,10 @@ pub struct Withdraw<'info> {
     )]
     pub vault: Account<'info, CollateralVault>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        address = vault.token_account
+    )]
     pub vault_token_account: Account<'info, TokenAccount>,
 
     #[account(mut)]
@@ -40,6 +43,11 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
     );
     require!(vault.locked_balance == 0, ErrorCode::ActivePosition);
 
+    require!(
+        ctx.accounts.user_token_account.owner == ctx.accounts.user.key(),
+        ErrorCode::InvalidAuthority
+    );
+
     token::transfer(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
@@ -53,9 +61,18 @@ pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
         amount,
     )?;
 
-    vault.total_balance -= amount; //@note use secure under achor only to avoid underflow
-    vault.available_balance -= amount;
-    vault.total_withdrawn += amount;
+    vault.total_balance = vault
+        .total_balance
+        .checked_sub(amount)
+        .ok_or(ErrorCode::Underflow)?;
+    vault.available_balance = vault
+        .available_balance
+        .checked_sub(amount)
+        .ok_or(ErrorCode::Underflow)?;
+    vault.total_withdrawn = vault
+        .total_withdrawn
+        .checked_add(amount)
+        .ok_or(ErrorCode::Overflow)?;
 
     emit!(WithdrawEvent {
         user: ctx.accounts.user.key(),

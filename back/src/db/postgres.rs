@@ -1,10 +1,11 @@
 // src/db/postgres.rs
 use anyhow::Result;
-use sqlx::{PgPool, Pool, Postgres, Row};
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 use super::models::*;
 
+#[derive(Clone)]
 pub struct PostgresDatabase {
     pub pool: PgPool,
 }
@@ -17,9 +18,51 @@ impl PostgresDatabase {
 
     pub async fn init_schema(&self) -> Result<()> {
         // Run migrations or create tables if they don't exist
-        sqlx::query(include_str!("../../migrations/001_initial_schema.sql"))
-            .execute(&self.pool)
-            .await?;
+        println!("🔧 Running database migrations...");
+        let sql_content = include_str!("../../migrations/001_initial_schema.sql");
+
+        // Remove comments and split into statements more robustly
+        let cleaned_sql: String = sql_content
+            .lines()
+            .filter(|line| !line.trim().starts_with("--"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        // Split by semicolons and execute each statement
+        let statements: Vec<&str> = cleaned_sql
+            .split(';')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        println!("📝 Found {} SQL statements to execute", statements.len());
+
+        for (idx, statement) in statements.iter().enumerate() {
+            let preview = if statement.len() > 50 {
+                format!("{}...", &statement[..50])
+            } else {
+                statement.to_string()
+            };
+            println!(
+                "   [{}/{}] Executing: {}",
+                idx + 1,
+                statements.len(),
+                preview
+            );
+
+            sqlx::query(statement)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to execute SQL statement: {}\nError: {}",
+                        &statement[..std::cmp::min(100, statement.len())],
+                        e
+                    )
+                })?;
+        }
+
+        println!("✅ Database schema initialized successfully");
         Ok(())
     }
 
@@ -151,6 +194,8 @@ impl PostgresDatabase {
                     "Lock" => TransactionType::Lock,
                     "Unlock" => TransactionType::Unlock,
                     "Transfer" => TransactionType::Transfer,
+                    "WithdrawalRequest" => TransactionType::WithdrawalRequest,
+                    "WithdrawalExecute" => TransactionType::WithdrawalExecute,
                     _ => TransactionType::Deposit,
                 },
                 amount: row.get::<i64, _>("amount") as u64,
@@ -196,6 +241,8 @@ impl PostgresDatabase {
                     "Lock" => TransactionType::Lock,
                     "Unlock" => TransactionType::Unlock,
                     "Transfer" => TransactionType::Transfer,
+                    "WithdrawalRequest" => TransactionType::WithdrawalRequest,
+                    "WithdrawalExecute" => TransactionType::WithdrawalExecute,
                     _ => TransactionType::Deposit,
                 },
                 amount: row.get::<i64, _>("amount") as u64,

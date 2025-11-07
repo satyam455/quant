@@ -732,6 +732,7 @@ dependencies = [
  "axum",
  "chrono",
  "collateral_vault",
+ "dotenvy",
  "futures",
  "serde",
  "serde_json",

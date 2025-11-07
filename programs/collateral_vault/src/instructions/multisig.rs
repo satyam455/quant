@@ -47,7 +47,7 @@ pub fn initialize_multisig(
     emit!(MultisigInitialized {
         vault: ctx.accounts.vault.key(),
         threshold,
-        signers: multisig.signers.len() as u8,
+        signer_count: multisig.signers.len() as u8,
         timestamp: Clock::get()?.unix_timestamp,
     });
 

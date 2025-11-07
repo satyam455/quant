@@ -6,7 +6,10 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use crate::db::{BalanceSnapshot, Database};
 use crate::vault_manager::VaultManager;
+use chrono::Utc;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaultBalance {
@@ -37,14 +40,16 @@ pub enum AlertType {
 
 pub struct BalanceTracker {
     vault_manager: Arc<VaultManager>,
+    database: Arc<Database>,
     cached_balances: Arc<RwLock<std::collections::HashMap<String, VaultBalance>>>,
     alerts: Arc<RwLock<Vec<BalanceAlert>>>,
 }
 
 impl BalanceTracker {
-    pub fn new(vault_manager: Arc<VaultManager>) -> Self {
+    pub fn new(vault_manager: Arc<VaultManager>, database: Arc<Database>) -> Self {
         Self {
             vault_manager,
+            database,
             cached_balances: Arc::new(RwLock::new(std::collections::HashMap::new())),
             alerts: Arc::new(RwLock::new(Vec::new())),
         }
@@ -78,6 +83,26 @@ impl BalanceTracker {
         // Update cache
         let mut cache = self.cached_balances.write().await;
         cache.insert(user.to_string(), balance.clone());
+        drop(cache);
+
+        // Persist snapshot + balances
+        let snapshot = BalanceSnapshot {
+            id: Uuid::new_v4().to_string(),
+            user: balance.owner.clone(),
+            total_balance: balance.total_balance,
+            locked_balance: balance.locked_balance,
+            available_balance: balance.available_balance,
+            timestamp: Utc::now().timestamp(),
+        };
+        self.database.insert_snapshot(snapshot).await?;
+        self.database
+            .update_vault_balances(
+                &balance.owner,
+                balance.total_balance,
+                balance.locked_balance,
+                balance.available_balance,
+            )
+            .await?;
 
         // Check for alerts
         self.check_balance_alerts(&balance).await;
@@ -103,15 +128,26 @@ impl BalanceTracker {
 
         // Alert 1: Low balance (less than 1000 tokens)
         if balance.available_balance < 1_000_000 && balance.available_balance > 0 {
-            alerts.push(BalanceAlert {
+            let timestamp = Utc::now().timestamp();
+            let alert = BalanceAlert {
                 vault: balance.owner.clone(),
                 alert_type: AlertType::LowBalance,
                 message: format!(
                     "Low available balance: {} tokens",
                     balance.available_balance
                 ),
-                timestamp: chrono::Utc::now().timestamp(),
-            });
+                timestamp,
+            };
+            alerts.push(alert.clone());
+            let _ = self
+                .database
+                .create_alert(
+                    "LOW_BALANCE",
+                    "MEDIUM",
+                    Some(balance.owner.as_str()),
+                    &alert.message,
+                )
+                .await;
         }
 
         // Alert 2: High locked ratio (>80% locked)
@@ -119,12 +155,24 @@ impl BalanceTracker {
             let locked_ratio =
                 (balance.locked_balance as f64 / balance.total_balance as f64) * 100.0;
             if locked_ratio > 80.0 {
-                alerts.push(BalanceAlert {
+                let message = format!("High locked ratio: {:.2}%", locked_ratio);
+                let timestamp = Utc::now().timestamp();
+                let alert = BalanceAlert {
                     vault: balance.owner.clone(),
                     alert_type: AlertType::HighLockedRatio,
-                    message: format!("High locked ratio: {:.2}%", locked_ratio),
-                    timestamp: chrono::Utc::now().timestamp(),
-                });
+                    message: message.clone(),
+                    timestamp,
+                };
+                alerts.push(alert.clone());
+                let _ = self
+                    .database
+                    .create_alert(
+                        "HIGH_LOCKED_RATIO",
+                        "HIGH",
+                        Some(balance.owner.as_str()),
+                        &message,
+                    )
+                    .await;
             }
         }
 
@@ -137,6 +185,25 @@ impl BalanceTracker {
 
     /// Get all alerts
     pub async fn get_alerts(&self) -> Vec<BalanceAlert> {
+        if let Ok(active_alerts) = self.database.get_active_alerts().await {
+            if !active_alerts.is_empty() {
+                return active_alerts
+                    .into_iter()
+                    .map(|alert| BalanceAlert {
+                        vault: alert.user.unwrap_or_default(),
+                        alert_type: match alert.alert_type.as_str() {
+                            "LOW_BALANCE" => AlertType::LowBalance,
+                            "HIGH_LOCKED_RATIO" => AlertType::HighLockedRatio,
+                            "BALANCE_DISCREPANCY" => AlertType::Discrepancy,
+                            _ => AlertType::UnauthorizedAccess,
+                        },
+                        message: alert.message,
+                        timestamp: alert.timestamp,
+                    })
+                    .collect();
+            }
+        }
+
         let alerts = self.alerts.read().await;
         alerts.clone()
     }
@@ -150,18 +217,50 @@ impl BalanceTracker {
             // Check for discrepancies
             if cached_balance.total_balance != on_chain.total_balance {
                 let mut alerts = self.alerts.write().await;
+                let user_str = user.to_string();
+                let message = format!(
+                    "Balance mismatch! Cached: {}, On-chain: {}",
+                    cached_balance.total_balance, on_chain.total_balance
+                );
+                let timestamp = Utc::now().timestamp();
                 alerts.push(BalanceAlert {
-                    vault: user.to_string(),
+                    vault: user_str.clone(),
                     alert_type: AlertType::Discrepancy,
-                    message: format!(
-                        "Balance mismatch! Cached: {}, On-chain: {}",
-                        cached_balance.total_balance, on_chain.total_balance
-                    ),
-                    timestamp: chrono::Utc::now().timestamp(),
+                    message: message.clone(),
+                    timestamp,
                 });
+                let _ = self
+                    .database
+                    .create_alert(
+                        "BALANCE_DISCREPANCY",
+                        "CRITICAL",
+                        Some(user_str.as_str()),
+                        &message,
+                    )
+                    .await;
+                let _ = self
+                    .database
+                    .log_reconciliation(
+                        user_str.as_str(),
+                        on_chain.total_balance,
+                        cached_balance.total_balance,
+                        "MISMATCH",
+                    )
+                    .await;
                 return Ok(false);
             }
         }
+
+        let user_str = user.to_string();
+        let _ = self
+            .database
+            .log_reconciliation(
+                user_str.as_str(),
+                on_chain.total_balance,
+                on_chain.total_balance,
+                "MATCH",
+            )
+            .await;
 
         Ok(true)
     }

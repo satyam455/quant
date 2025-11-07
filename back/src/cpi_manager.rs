@@ -22,7 +22,10 @@ impl CPIManager {
         println!("🔐 Locking {} tokens for position {}", amount, position_id);
 
         // Call the lock instruction
-        let sig = self.vault_manager.lock(user, amount).await?;
+        let sig = self
+            .vault_manager
+            .lock(user, self.vault_manager.program.id(), amount)
+            .await?;
 
         println!("✅ Locked successfully: {}", sig);
         Ok(sig)
@@ -40,7 +43,10 @@ impl CPIManager {
             amount, position_id
         );
 
-        let sig = self.vault_manager.unlock(user, amount).await?;
+        let sig = self
+            .vault_manager
+            .unlock(user, self.vault_manager.program.id(), amount)
+            .await?;
 
         println!("✅ Unlocked successfully: {}", sig);
         Ok(sig)
@@ -59,7 +65,10 @@ impl CPIManager {
             amount, from, to, liquidation_id
         );
 
-        let sig = self.vault_manager.transfer(from, to, amount).await?;
+        let sig = self
+            .vault_manager
+            .transfer(from, to, self.vault_manager.program.id(), amount)
+            .await?;
 
         println!("✅ Liquidation transfer successful: {}", sig);
         Ok(sig)
@@ -84,7 +93,11 @@ impl CPIManager {
 
     /// Handle CPI errors gracefully
     pub async fn safe_lock(&self, user: Pubkey, amount: u64) -> Result<Option<String>> {
-        match self.vault_manager.lock(user, amount).await {
+        match self
+            .vault_manager
+            .lock(user, self.vault_manager.program.id(), amount)
+            .await
+        {
             Ok(sig) => Ok(Some(sig)),
             Err(e) => {
                 eprintln!("⚠️  Lock failed for {}: {}", user, e);

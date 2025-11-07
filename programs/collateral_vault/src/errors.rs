@@ -6,6 +6,12 @@ pub enum ErrorCode {
     InvalidMint,
     #[msg("Invalid amount provided")]
     InvalidAmount,
+    #[msg("Duplicate authorization entry")]
+    AuthorizationAlreadyExists,
+    #[msg("Maximum number of authorized programs reached")]
+    AuthorizedProgramsCapacity,
+    #[msg("Program not authorized")]
+    Unauthorized,
     #[msg("Insufficient balance")]
     InsufficientFunds,
     #[msg("Position Active")]
@@ -18,4 +24,12 @@ pub enum ErrorCode {
     Underflow,
     #[msg("Invalid authority")]
     InvalidAuthority,
+    #[msg("Withdrawal request not yet available")]
+    WithdrawalDelayNotMet,
+    #[msg("Withdrawal request already executed")]
+    AlreadyExecuted,
+    #[msg("Vault authority mismatch")]
+    InvalidVaultAuthority,
+    #[msg("Withdrawal request does not match vault")]
+    InvalidWithdrawalRequest,
 }

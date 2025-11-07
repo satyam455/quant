@@ -20,7 +20,7 @@ mod test_utils {
     }
 
     pub fn get_program_id() -> Pubkey {
-        Pubkey::from_str("4NYik8PfZkQdj89AjVxX8LWHZyPKWQ647XKNpCMk6gAR").unwrap()
+        Pubkey::from_str("GfHdK9T6kBwS55D9pv97CbNE9PdP4kpASxMipM7gWSKa").unwrap()
     }
 }
 

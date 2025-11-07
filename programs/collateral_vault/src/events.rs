@@ -47,3 +47,42 @@ pub struct CollateralTransferred {
     pub amount: u64,
     pub timestamp: i64,
 }
+
+#[event]
+pub struct AuthorizedProgramAdded {
+    pub vault: Pubkey,
+    pub program: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct AuthorizedProgramRemoved {
+    pub vault: Pubkey,
+    pub program: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct WithdrawalRequested {
+    pub user: Pubkey,
+    pub vault: Pubkey,
+    pub amount: u64,
+    pub available_at: i64,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct WithdrawalExecuted {
+    pub user: Pubkey,
+    pub vault: Pubkey,
+    pub amount: u64,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct MultisigInitialized {
+    pub vault: Pubkey,
+    pub threshold: u8,
+    pub signer_count: u8,
+    pub timestamp: i64,
+}

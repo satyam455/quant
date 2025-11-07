@@ -19,6 +19,8 @@ pub enum TransactionType {
     Lock,
     Unlock,
     Transfer,
+    WithdrawalRequest,
+    WithdrawalExecute,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
