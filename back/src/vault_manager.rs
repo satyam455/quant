@@ -15,6 +15,7 @@ use std::sync::Arc;
 pub struct VaultManager {
     pub program: Program<Arc<Keypair>>,
     pub payer: Arc<Keypair>,
+    pub user: Option<Arc<Keypair>>,
     pub usdt_mint: Pubkey,
 }
 
@@ -22,17 +23,20 @@ impl VaultManager {
     pub fn new(
         rpc_url: String,
         payer: Keypair,
+        user: Option<Keypair>,
         program_id: Pubkey,
         usdt_mint: Pubkey,
     ) -> Result<Self> {
         let cluster = Cluster::Custom(rpc_url.clone(), rpc_url);
         let payer = Arc::new(payer);
+        let user = user.map(Arc::new);
         let client =
             Client::new_with_options(cluster, payer.clone(), CommitmentConfig::confirmed());
         let program = client.program(program_id)?;
         Ok(Self {
             program,
             payer,
+            user,
             usdt_mint,
         })
     }
@@ -79,11 +83,19 @@ impl VaultManager {
             data: ix_data,
         };
 
+        // Build signer list: always include payer, add user if available and matches
+        let mut signers: Vec<&Keypair> = vec![&*self.payer];
+        if let Some(ref user_keypair) = self.user {
+            if user == user_keypair.pubkey() {
+                signers.push(&**user_keypair);
+            }
+        }
+
         let sig = self.program.rpc().send_and_confirm_transaction(
             &Transaction::new_signed_with_payer(
                 &[instruction],
                 Some(&self.payer.pubkey()),
-                &[&*self.payer],
+                &signers,
                 self.program.rpc().get_latest_blockhash()?,
             ),
         )?;
@@ -143,11 +155,19 @@ impl VaultManager {
             data: ix_data,
         };
 
+        // Build signer list: always include payer, add user if available and matches
+        let mut signers: Vec<&Keypair> = vec![&*self.payer];
+        if let Some(ref user_keypair) = self.user {
+            if user == user_keypair.pubkey() {
+                signers.push(&**user_keypair);
+            }
+        }
+
         let sig = self.program.rpc().send_and_confirm_transaction(
             &Transaction::new_signed_with_payer(
                 &[instruction],
                 Some(&self.payer.pubkey()),
-                &[&*self.payer],
+                &signers,
                 self.program.rpc().get_latest_blockhash()?,
             ),
         )?;
@@ -187,11 +207,19 @@ impl VaultManager {
             data: ix_data,
         };
 
+        // Build signer list: always include payer, add user if available and matches
+        let mut signers: Vec<&Keypair> = vec![&*self.payer];
+        if let Some(ref user_keypair) = self.user {
+            if user == user_keypair.pubkey() {
+                signers.push(&**user_keypair);
+            }
+        }
+
         let sig = self.program.rpc().send_and_confirm_transaction(
             &Transaction::new_signed_with_payer(
                 &[instruction],
                 Some(&self.payer.pubkey()),
-                &[&*self.payer],
+                &signers,
                 self.program.rpc().get_latest_blockhash()?,
             ),
         )?;
@@ -240,11 +268,19 @@ impl VaultManager {
             data: ix_data,
         };
 
+        // Build signer list: always include payer, add user if available and matches
+        let mut signers: Vec<&Keypair> = vec![&*self.payer];
+        if let Some(ref user_keypair) = self.user {
+            if user == user_keypair.pubkey() {
+                signers.push(&**user_keypair);
+            }
+        }
+
         let sig = self.program.rpc().send_and_confirm_transaction(
             &Transaction::new_signed_with_payer(
                 &[instruction],
                 Some(&self.payer.pubkey()),
-                &[&*self.payer],
+                &signers,
                 self.program.rpc().get_latest_blockhash()?,
             ),
         )?;
@@ -297,11 +333,19 @@ impl VaultManager {
             data: ix_data,
         };
 
+        // Build signer list: always include payer, add user if available and matches
+        let mut signers: Vec<&Keypair> = vec![&*self.payer];
+        if let Some(ref user_keypair) = self.user {
+            if user == user_keypair.pubkey() {
+                signers.push(&**user_keypair);
+            }
+        }
+
         let sig = self.program.rpc().send_and_confirm_transaction(
             &Transaction::new_signed_with_payer(
                 &[instruction],
                 Some(&self.payer.pubkey()),
-                &[&*self.payer],
+                &signers,
                 self.program.rpc().get_latest_blockhash()?,
             ),
         )?;
@@ -346,11 +390,19 @@ impl VaultManager {
             data: ix_data,
         };
 
+        // Build signer list: always include payer, add user if available and matches
+        let mut signers: Vec<&Keypair> = vec![&*self.payer];
+        if let Some(ref user_keypair) = self.user {
+            if user == user_keypair.pubkey() {
+                signers.push(&**user_keypair);
+            }
+        }
+
         let sig = self.program.rpc().send_and_confirm_transaction(
             &Transaction::new_signed_with_payer(
                 &[instruction],
                 Some(&self.payer.pubkey()),
-                &[&*self.payer],
+                &signers,
                 self.program.rpc().get_latest_blockhash()?,
             ),
         )?;
@@ -395,11 +447,19 @@ impl VaultManager {
             data: ix_data,
         };
 
+        // Build signer list: always include payer, add user if available and matches
+        let mut signers: Vec<&Keypair> = vec![&*self.payer];
+        if let Some(ref user_keypair) = self.user {
+            if user == user_keypair.pubkey() {
+                signers.push(&**user_keypair);
+            }
+        }
+
         let sig = self.program.rpc().send_and_confirm_transaction(
             &Transaction::new_signed_with_payer(
                 &[instruction],
                 Some(&self.payer.pubkey()),
-                &[&*self.payer],
+                &signers,
                 self.program.rpc().get_latest_blockhash()?,
             ),
         )?;
@@ -457,11 +517,19 @@ impl VaultManager {
             data: ix_data,
         };
 
+        // Build signer list: always include payer, add user if available and matches from user
+        let mut signers: Vec<&Keypair> = vec![&*self.payer];
+        if let Some(ref user_keypair) = self.user {
+            if from == user_keypair.pubkey() {
+                signers.push(&**user_keypair);
+            }
+        }
+
         let sig = self.program.rpc().send_and_confirm_transaction(
             &Transaction::new_signed_with_payer(
                 &[instruction],
                 Some(&self.payer.pubkey()),
-                &[&*self.payer],
+                &signers,
                 self.program.rpc().get_latest_blockhash()?,
             ),
         )?;
@@ -474,6 +542,7 @@ impl VaultManager {
 impl Clone for VaultManager {
     fn clone(&self) -> Self {
         let payer = self.payer.clone();
+        let user = self.user.clone();
         let cluster = Cluster::Custom(
             self.program.rpc().url().to_string(),
             self.program.rpc().url().to_string(),
@@ -487,6 +556,7 @@ impl Clone for VaultManager {
         Self {
             program,
             payer,
+            user,
             usdt_mint: self.usdt_mint,
         }
     }

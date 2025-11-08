@@ -11,6 +11,7 @@ pub struct AppConfig {
     pub database_url: String,
     pub bind_addr: SocketAddr,
     pub payer: Keypair,
+    pub user: Option<Keypair>,
 }
 
 impl AppConfig {
@@ -47,6 +48,22 @@ impl AppConfig {
             .parse::<SocketAddr>()
             .context("BIND_ADDR must be a valid socket address, e.g. 0.0.0.0:8080")?;
 
+        // Optional user keypair for testing (when backend needs to sign as user)
+        let user = if let Ok(user_key) = env::var("USER_KEYPAIR") {
+            if user_key.starts_with('[') {
+                // Parse JSON array format
+                let bytes: Vec<u8> = serde_json::from_str(&user_key)
+                    .context("USER_KEYPAIR must be valid JSON array")?;
+                Some(Keypair::from_bytes(&bytes)
+                    .map_err(|e| anyhow!("Invalid USER_KEYPAIR bytes: {}", e))?)
+            } else {
+                // Parse base58 format
+                Some(Keypair::from_base58_string(&user_key))
+            }
+        } else {
+            None
+        };
+
         Ok(Self {
             rpc_url,
             program_id,
@@ -54,6 +71,7 @@ impl AppConfig {
             database_url,
             bind_addr,
             payer,
+            user,
         })
     }
 }

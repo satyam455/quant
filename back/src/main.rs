@@ -33,12 +33,13 @@ async fn main() -> Result<()> {
         database_url,
         bind_addr,
         payer,
+        user,
     } = AppConfig::from_env()?;
 
     // Create VaultManager in a blocking context to avoid runtime conflicts
     // anchor-client uses synchronous RPC calls that can conflict with tokio runtime
     let vault_mgr = tokio::task::spawn_blocking(move || {
-        vault_manager::VaultManager::new(rpc_url, payer, program_id, usdt_mint)
+        vault_manager::VaultManager::new(rpc_url, payer, user, program_id, usdt_mint)
     })
     .await
     .map_err(|err| anyhow!("Failed to join VaultManager task: {err}"))??;
