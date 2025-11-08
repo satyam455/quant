@@ -1,14 +1,17 @@
-use anyhow::{anyhow, Context, Result};
+use anchor_client::solana_sdk::signature::read_keypair_file;
+use anchor_lang::prelude::Pubkey;
+use anyhow::Result;
 use axum::{
     routing::{get, post},
     Extension, Router,
 };
+use std::env;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
 mod analytics;
 mod balance_tracker;
-mod config;
 mod cpi_manager;
 mod db;
 mod handlers;
@@ -18,7 +21,6 @@ mod websocket;
 
 use analytics::AnalyticsService;
 use balance_tracker::BalanceTracker;
-use config::AppConfig;
 use cpi_manager::CPIManager;
 use db::{postgres::PostgresDatabase, Database};
 use vault_monitor::VaultMonitor;
@@ -26,119 +28,154 @@ use websocket::WebSocketManager;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let AppConfig {
-        rpc_url,
-        program_id,
-        usdt_mint,
-        database_url,
-        bind_addr,
-        payer,
-        user,
-    } = AppConfig::from_env()?;
+    let payer = read_keypair_file("/home/satyam/.config/solana/id.json")
+        .expect("Failed to read Solana keypair");
 
-    // Create VaultManager in a blocking context to avoid runtime conflicts
-    // anchor-client uses synchronous RPC calls that can conflict with tokio runtime
-    let vault_mgr = tokio::task::spawn_blocking(move || {
-        vault_manager::VaultManager::new(rpc_url, payer, user, program_id, usdt_mint)
-    })
-    .await
-    .map_err(|err| anyhow!("Failed to join VaultManager task: {err}"))??;
-    let vault_mgr = Arc::new(vault_mgr);
+    let program_id: Pubkey = "GfHdK9T6kBwS55D9pv97CbNE9PdP4kpASxMipM7gWSKa"
+        .parse()
+        .unwrap();
 
-    println!(
-        "✅ VaultManager ready - program: {} mint: {}",
-        program_id, usdt_mint
+    let usdt_mint: Pubkey = "36YuSPgXkeWCKQcyoibHgdHzF91CMPyhbRo22EiaWFZD"
+        .parse()
+        .expect("Invalid USDT mint address");
+
+    let vault_mgr = Arc::new(
+        vault_manager::VaultManager::new(
+            "https://api.devnet.solana.com".to_string(),
+            payer,
+            None,
+            program_id,
+            usdt_mint,
+        )
+        .expect("Failed to create VaultManager"),
     );
 
-    println!("🔗 Connecting to database: {}", database_url);
-    let postgres = match PostgresDatabase::new(&database_url).await {
-        Ok(pool) => {
-            println!("✅ Database connected successfully");
-            pool
-        }
-        Err(err) => {
-            eprintln!("❌ Failed to connect to PostgreSQL: {err}");
-            return Err(err.into());
-        }
-    };
+    println!("VaultManager initialized successfully");
+    println!("Program ID: {}", program_id);
+    println!("USDT Mint: {}", usdt_mint);
 
-    if let Err(err) = postgres.init_schema().await {
-        eprintln!("❌ Failed to run database migrations: {err}");
-        return Err(err.into());
-    }
-
-    let database = Arc::new(Database::new(Some(postgres.clone())));
+    // Initialize all components
+    let database = Arc::new(Database::new(None));
     let balance_tracker = Arc::new(BalanceTracker::new(vault_mgr.clone(), database.clone()));
+    let cpi_manager = Arc::new(CPIManager::new(vault_mgr.clone()));
     let vault_monitor = Arc::new(VaultMonitor::new(balance_tracker.clone(), database.clone()));
-    let analytics = Arc::new(AnalyticsService::new(postgres));
     let ws_manager = Arc::new(WebSocketManager::new());
-    let _cpi_manager = Arc::new(CPIManager::new(vault_mgr.clone()));
 
+    // Start background services (now inside tokio runtime)
     balance_tracker.clone().start_monitoring();
     vault_monitor.clone().start();
 
-    let app = Router::new()
-        .route("/health", get(handlers::health_check))
-        .route("/vault/initialize", post(handlers::initialize_vault))
-        .route("/vault/deposit", post(handlers::deposit_collateral))
-        .route("/vault/withdraw", post(handlers::withdraw_collateral))
-        .route(
-            "/vault/request-withdrawal",
-            post(handlers::request_withdrawal),
-        )
-        .route(
-            "/vault/execute-withdrawal",
-            post(handlers::execute_withdrawal),
-        )
-        .route("/vault/lock", post(handlers::lock_collateral))
-        .route("/vault/unlock", post(handlers::unlock_collateral))
-        .route("/vault/transfer", post(handlers::transfer_collateral))
-        .route("/vault/balance/{user}", get(handlers::get_balance))
-        .route(
-            "/vault/transactions/{user}",
-            get(handlers::get_transactions),
-        )
-        .route("/vault/status/{user}", get(handlers::get_vault_status))
-        .route("/vault/tvl", get(handlers::get_tvl))
-        .route("/vault/alerts", get(handlers::get_alerts))
-        .route(
-            "/analytics/dashboard",
-            get(handlers::get_dashboard_analytics),
-        )
-        .route(
-            "/analytics/tvl-history/{days}",
-            get(handlers::get_tvl_history),
-        )
-        .route("/ws", get(websocket::ws_handler))
-        .layer(Extension(vault_mgr))
-        .layer(Extension(balance_tracker))
-        .layer(Extension(database))
-        .layer(Extension(analytics))
-        .layer(Extension(ws_manager));
+    // Initialize PostgreSQL database
+    let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgresql://vault_user:secure_password_123@localhost/vault_management".to_string()
+    });
 
-    let listener = TcpListener::bind(bind_addr)
-        .await
-        .with_context(|| format!("Failed to bind to {}", bind_addr))?;
+    println!("Connecting to database: {}", database_url);
 
-    println!("\n🚀 Vault Backend Server Started at http://{}", bind_addr);
-    println!("📡 REST API:");
-    println!("   POST /vault/initialize");
-    println!("   POST /vault/deposit");
-    println!("   POST /vault/withdraw");
-    println!("   POST /vault/request-withdrawal");
-    println!("   POST /vault/execute-withdrawal");
-    println!("   POST /vault/lock");
-    println!("   POST /vault/unlock");
-    println!("   POST /vault/transfer");
-    println!("   GET  /vault/balance/{{user}}");
-    println!("   GET  /vault/transactions/{{user}}");
-    println!("   GET  /vault/status/{{user}}");
-    println!("   GET  /vault/tvl");
-    println!("   GET  /vault/alerts");
-    println!("   GET  /analytics/dashboard");
-    println!("   GET  /analytics/tvl-history/{{days}}");
-    println!("   GET  /health");
-    println!("📡 WebSocket: /ws");
+    let pg_db = match PostgresDatabase::new(&database_url).await {
+        Ok(db) => {
+            println!("Database connected successfully");
+            Some(db)
+        }
+        Err(e) => {
+            eprintln!("Database connection failed: {}", e);
+            eprintln!("Running without PostgreSQL analytics");
+            None
+        }
+    };
+
+    let app = if let Some(pg_db) = pg_db {
+        let analytics = Arc::new(AnalyticsService::new(pg_db));
+
+        Router::new()
+            // POST endpoints
+            .route("/register", post(handlers::register_vault))
+            .route("/deposit", post(handlers::deposit))
+            .route("/withdraw", post(handlers::withdraw))
+            .route("/lock", post(handlers::lock))
+            .route("/unlock", post(handlers::unlock))
+            .route("/transfer", post(handlers::transfer))
+            // GET endpoints
+            .route("/vault/balance/{user}", get(handlers::get_balance))
+            .route(
+                "/vault/transactions/{user}",
+                get(handlers::get_transactions),
+            )
+            .route("/vault/status/{user}", get(handlers::get_vault_status))
+            .route("/vault/tvl", get(handlers::get_tvl))
+            .route("/vault/alerts", get(handlers::get_alerts))
+            // Analytics endpoints
+            .route(
+                "/analytics/dashboard",
+                get(handlers::get_dashboard_analytics),
+            )
+            .route(
+                "/analytics/tvl-history/{days}",
+                get(handlers::get_tvl_history),
+            )
+            // WebSocket endpoint
+            .route("/ws", get(websocket::ws_handler))
+            .layer(Extension(vault_mgr))
+            .layer(Extension(balance_tracker))
+            .layer(Extension(database))
+            .layer(Extension(analytics))
+            .layer(Extension(ws_manager))
+    } else {
+        Router::new()
+            // POST endpoints
+            .route("/register", post(handlers::register_vault))
+            .route("/deposit", post(handlers::deposit))
+            .route("/withdraw", post(handlers::withdraw))
+            .route("/lock", post(handlers::lock))
+            .route("/unlock", post(handlers::unlock))
+            .route("/transfer", post(handlers::transfer))
+            // GET endpoints
+            .route("/vault/balance/{user}", get(handlers::get_balance))
+            .route(
+                "/vault/transactions/{user}",
+                get(handlers::get_transactions),
+            )
+            .route("/vault/status/{user}", get(handlers::get_vault_status))
+            .route("/vault/tvl", get(handlers::get_tvl))
+            .route("/vault/alerts", get(handlers::get_alerts))
+            // WebSocket endpoint
+            .route("/ws", get(websocket::ws_handler))
+            .layer(Extension(vault_mgr))
+            .layer(Extension(balance_tracker))
+            .layer(Extension(database))
+            .layer(Extension(ws_manager))
+    };
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+    let listener = TcpListener::bind(addr).await?;
+
+    println!("\n=================================");
+    println!("   Vault Backend Server Started");
+    println!("   =================================");
+    println!("\nServer: http://{}", addr);
+    println!("\nREST API Endpoints:");
+    println!("\n   POST Endpoints:");
+    println!("   - /register               - Initialize vault");
+    println!("   - /deposit                - Deposit collateral");
+    println!("   - /withdraw               - Withdraw collateral");
+    println!("   - /lock                   - Lock collateral");
+    println!("   - /unlock                 - Unlock collateral");
+    println!("   - /transfer               - Transfer collateral");
+    println!("\n   GET Endpoints:");
+    println!("   - /vault/balance/{{user}}    - Get vault balance");
+    println!("   - /vault/transactions/{{user}} - Get transaction history");
+    println!("   - /vault/status/{{user}}     - Get vault status");
+    println!("   - /vault/tvl              - Get total value locked");
+    println!("   - /vault/alerts           - Get system alerts");
+    println!("\n   Analytics:");
+    println!("   - /analytics/dashboard    - System analytics");
+    println!("   - /analytics/tvl-history/{{days}} - TVL history");
+    println!("\n   WebSocket:");
+    println!("   - /ws                     - Real-time updates");
+    println!("\nMonitoring Services:");
+    println!("   - Balance Tracker  [ACTIVE]");
+    println!("   - Vault Monitor    [ACTIVE]");
+    println!("\n=================================\n");
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
@@ -150,5 +187,5 @@ async fn main() -> Result<()> {
 async fn shutdown_signal() {
     use tokio::signal;
     let _ = signal::ctrl_c().await;
-    println!("\n🛑 Shutting down gracefully...");
+    println!("\nShutting down gracefully...");
 }

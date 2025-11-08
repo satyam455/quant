@@ -273,7 +273,7 @@ impl BalanceTracker {
                 interval.tick().await;
                 // Monitor TVL
                 let tvl = self.calculate_tvl().await;
-                println!("📊 Current TVL: {} tokens", tvl);
+                println!("Current TVL: {} tokens", tvl);
 
                 // You can add more monitoring logic here
             }

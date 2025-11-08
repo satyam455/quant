@@ -94,7 +94,7 @@ async fn record_transaction(
         timestamp,
     };
     if let Err(err) = db.insert_transaction(record).await {
-        eprintln!("⚠️  Failed to store transaction: {}", err);
+        eprintln!("Failed to store transaction: {}", err);
     }
 
     let audit = AuditLog {
@@ -106,7 +106,7 @@ async fn record_transaction(
         timestamp,
     };
     if let Err(err) = db.insert_audit_log(audit).await {
-        eprintln!("⚠️  Failed to store audit log: {}", err);
+        eprintln!("Failed to store audit log: {}", err);
     }
 }
 
@@ -747,3 +747,11 @@ pub async fn get_tvl_history(
             .into_response(),
     }
 }
+
+// Aliases for route handlers to match main.rs
+pub use initialize_vault as register_vault;
+pub use deposit_collateral as deposit;
+pub use withdraw_collateral as withdraw;
+pub use lock_collateral as lock;
+pub use unlock_collateral as unlock;
+pub use transfer_collateral as transfer;

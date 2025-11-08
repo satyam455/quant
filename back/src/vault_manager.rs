@@ -2,11 +2,12 @@ use anchor_client::{
     solana_sdk::{
         commitment_config::CommitmentConfig,
         signature::{Keypair, Signer},
-        system_program, sysvar,
+        sysvar,
         transaction::Transaction,
     },
     Client, Cluster, Program,
 };
+use solana_program::system_program;
 use anchor_lang::{prelude::Pubkey, AccountDeserialize};
 use anchor_spl::token::TokenAccount;
 use anyhow::Result;
@@ -46,7 +47,7 @@ impl VaultManager {
         user: Pubkey,
         authorized_programs: Vec<Pubkey>,
     ) -> Result<String> {
-        println!("🚀 Initializing vault for user {}", user);
+        println!("Initializing vault for user {}", user);
 
         let (vault_pda, _) =
             Pubkey::find_program_address(&[b"vault", user.as_ref()], &self.program.id());
@@ -100,12 +101,12 @@ impl VaultManager {
             ),
         )?;
 
-        println!("✅ Vault initialized: {}", sig);
+        println!("Vault initialized: {}", sig);
         Ok(sig.to_string())
     }
 
     pub async fn deposit(&self, user: Pubkey, amount: u64) -> Result<String> {
-        println!("💰 Depositing {} tokens for {}", amount, user);
+        println!("Depositing {} tokens for {}", amount, user);
 
         let (vault_pda, _) =
             Pubkey::find_program_address(&[b"vault", user.as_ref()], &self.program.id());
@@ -172,12 +173,12 @@ impl VaultManager {
             ),
         )?;
 
-        println!("✅ Deposit successful: {}", sig);
+        println!("Deposit successful: {}", sig);
         Ok(sig.to_string())
     }
 
     pub async fn withdraw(&self, user: Pubkey, amount: u64) -> Result<String> {
-        println!("🏦 Withdrawing {} tokens for {}", amount, user);
+        println!("Withdrawing {} tokens for {}", amount, user);
 
         let (vault_pda, _) =
             Pubkey::find_program_address(&[b"vault", user.as_ref()], &self.program.id());
@@ -224,7 +225,7 @@ impl VaultManager {
             ),
         )?;
 
-        println!("✅ Withdrawal successful: {}", sig);
+        println!("Withdrawal successful: {}", sig);
         Ok(sig.to_string())
     }
 
@@ -235,7 +236,7 @@ impl VaultManager {
         amount: u64,
     ) -> Result<String> {
         println!(
-            "📝 Requesting delayed withdrawal of {} for {} (request #{})",
+            "Requesting delayed withdrawal of {} for {} (request #{})",
             amount, user, request_id
         );
 
@@ -285,13 +286,13 @@ impl VaultManager {
             ),
         )?;
 
-        println!("✅ Withdrawal request placed: {}", sig);
+        println!("Withdrawal request placed: {}", sig);
         Ok(sig.to_string())
     }
 
     pub async fn execute_withdrawal(&self, user: Pubkey, request_id: u64) -> Result<String> {
         println!(
-            "🚚 Executing delayed withdrawal for {} (request #{})",
+            "Executing delayed withdrawal for {} (request #{})",
             user, request_id
         );
 
@@ -350,7 +351,7 @@ impl VaultManager {
             ),
         )?;
 
-        println!("✅ Withdrawal executed: {}", sig);
+        println!("Withdrawal executed: {}", sig);
         Ok(sig.to_string())
     }
 
@@ -360,7 +361,7 @@ impl VaultManager {
         authority_program: Pubkey,
         amount: u64,
     ) -> Result<String> {
-        println!("🔒 Locking {} collateral for {}", amount, user);
+        println!("Locking {} collateral for {}", amount, user);
 
         let (vault_pda, _) =
             Pubkey::find_program_address(&[b"vault", user.as_ref()], &self.program.id());
@@ -407,7 +408,7 @@ impl VaultManager {
             ),
         )?;
 
-        println!("✅ Collateral locked: {}", sig);
+        println!("Collateral locked: {}", sig);
         Ok(sig.to_string())
     }
 
@@ -417,7 +418,7 @@ impl VaultManager {
         authority_program: Pubkey,
         amount: u64,
     ) -> Result<String> {
-        println!("🔓 Unlocking {} collateral for {}", amount, user);
+        println!("Unlocking {} collateral for {}", amount, user);
 
         let (vault_pda, _) =
             Pubkey::find_program_address(&[b"vault", user.as_ref()], &self.program.id());
@@ -464,7 +465,7 @@ impl VaultManager {
             ),
         )?;
 
-        println!("✅ Collateral unlocked: {}", sig);
+        println!("Collateral unlocked: {}", sig);
         Ok(sig.to_string())
     }
 
@@ -475,7 +476,7 @@ impl VaultManager {
         authority_program: Pubkey,
         amount: u64,
     ) -> Result<String> {
-        println!("📤 Transferring {} from {} to {}", amount, from, to);
+        println!("Transferring {} from {} to {}", amount, from, to);
 
         let (from_vault, _) =
             Pubkey::find_program_address(&[b"vault", from.as_ref()], &self.program.id());
@@ -534,7 +535,7 @@ impl VaultManager {
             ),
         )?;
 
-        println!("✅ Transfer successful: {}", sig);
+        println!("Transfer successful: {}", sig);
         Ok(sig.to_string())
     }
 }
