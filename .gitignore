@@ -101,3 +101,12 @@ test_complete.sh
 test_api.sh
 
 Instruction_ReadMe.md
+
+4-run-tests.bat
+4-run-tests.sh
+5-run-api.bat
+5-run-api.sh
+6-full-test.sh
+7-add-authorized-program.sh
+8-quick-fix.sh
+
