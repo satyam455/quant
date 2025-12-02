@@ -8,7 +8,7 @@ pub mod state;
 
 use instructions::*;
 
-declare_id!("GfHdK9T6kBwS55D9pv97CbNE9PdP4kpASxMipM7gWSKa");
+declare_id!("HVTfDP8XYEQrTyaHwhWZx5s4dogW7kwxyC3DeNdXTzq");
 
 #[program]
 pub mod collateral_vault {
