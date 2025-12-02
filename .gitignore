@@ -8,29 +8,19 @@ test-ledger
 ./target
 
 .cursorrules
-.env
 
 QUICKSTART.md
 BUILD_AND_RUN.md
 README.md
 .cursorrules
-.env
 .cursorrules
-.env
 .cursorrules
-.env
 .cursorrules
-.env
 .cursorrules
-.env
 .cursorrules
-.env
 .cursorrules
-.env
 .cursorrules
-.env
 .cursorrules
-.env
 
 build-fix.bat
 run-backend.bat 
@@ -110,3 +100,4 @@ Instruction_ReadMe.md
 7-add-authorized-program.sh
 8-quick-fix.sh
 
+config.bat
